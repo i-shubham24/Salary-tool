@@ -1,35 +1,86 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 
 export default function AuditTable({ changes }) {
+  const [expandedRow, setExpandedRow] = useState(null);
+
+  const toggleRow = (empId) => {
+    setExpandedRow(expandedRow === empId ? null : empId);
+  };
+
   return (
     <div className="bg-white rounded-xl border shadow-sm overflow-hidden h-full flex flex-col">
       <div className="p-4 border-b bg-slate-50 flex-shrink-0">
         <h3 className="font-bold text-md text-slate-700">Detailed Variance Registry</h3>
       </div>
-      <div className="overflow-y-auto flex-grow max-h-80">
+      
+      <div className="overflow-y-auto flex-grow max-h-[500px]">
         <table className="w-full text-left border-collapse text-sm">
-          <thead className="sticky top-0 bg-slate-100 z-10">
+          <thead className="sticky top-0 bg-slate-100 z-10 shadow-sm">
             <tr className="text-slate-500 uppercase text-xs font-semibold tracking-wider border-b">
+              <th className="p-3 w-10"></th>
               <th className="p-3">ID</th>
               <th className="p-3">Name</th>
-              <th className="p-3">Type</th>
-              <th className="p-3 text-right">Gross Shift ($\Delta$)</th>
+              <th className="p-3">Status</th>
+              <th className="p-3 text-right">Net Gross Shift</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
-            {changes.map((change, idx) => (
-              <tr key={idx} className="hover:bg-slate-50">
-                <td className="p-3 font-mono text-xs text-slate-500">{change.empId}</td>
-                <td className="p-3 font-medium text-slate-800">{change.name}</td>
-                <td className="p-3">
-                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${change.type === 'NEW_EMPLOYEE' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
-                    {change.type}
-                  </span>
-                </td>
-                <td className={`p-3 text-right font-bold ${change.grossDelta >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                  {change.grossDelta >= 0 ? '+' : ''}{change.grossDelta.toLocaleString()}
-                </td>
-              </tr>
+          <tbody className="divide-y divide-slate-200">
+            {changes.map((change) => (
+              <React.Fragment key={change.empId}>
+                {/* Main Row */}
+                <tr 
+                  onClick={() => toggleRow(change.empId)}
+                  className={`hover:bg-slate-50 cursor-pointer transition-colors ${expandedRow === change.empId ? 'bg-blue-50/50' : ''}`}
+                >
+                  <td className="p-3 text-slate-400">
+                    {expandedRow === change.empId ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </td>
+                  <td className="p-3 font-mono text-xs text-slate-500">{change.empId}</td>
+                  <td className="p-3 font-medium text-slate-800">{change.name}</td>
+                  <td className="p-3">
+                    <span className={`px-2 py-0.5 rounded text-xs font-semibold ${change.type === 'NEW_EMPLOYEE' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                      {change.type}
+                    </span>
+                  </td>
+                  <td className={`p-3 text-right font-bold ${change.grossDelta > 0 ? 'text-emerald-600' : change.grossDelta < 0 ? 'text-rose-600' : 'text-slate-600'}`}>
+                    {change.grossDelta > 0 ? '+' : ''}{change.grossDelta.toLocaleString()}
+                  </td>
+                </tr>
+
+                {/* Expanded Details Sub-Row */}
+                {expandedRow === change.empId && (
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <td colSpan="5" className="p-0">
+                      <div className="p-4 pl-12 bg-slate-50/80 border-l-4 border-blue-400 m-2 rounded-r-lg">
+                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3"/> Component Level Changes
+                        </h4>
+                        
+                        {Object.keys(change.breakdown).length === 0 ? (
+                          <p className="text-sm text-slate-500 italic">No internal components shifted.</p>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {Object.entries(change.breakdown).map(([component, data]) => (
+                              <div key={component} className="bg-white p-3 rounded border shadow-sm flex flex-col">
+                                <span className="font-semibold text-slate-700 text-sm mb-1">{component}</span>
+                                <div className="flex justify-between text-xs text-slate-500 mt-1">
+                                  <span>Old: <span className="font-mono">{data.old.toLocaleString()}</span></span>
+                                  <span>New: <span className="font-mono">{data.new.toLocaleString()}</span></span>
+                                </div>
+                                <div className={`text-right text-xs font-bold mt-2 pt-2 border-t ${data.delta > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                  Diff: {data.delta > 0 ? '+' : ''}{data.delta.toLocaleString()} 
+                                  <span className="text-[10px] ml-1 text-slate-400">({data.pct}%)</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
             ))}
           </tbody>
         </table>
