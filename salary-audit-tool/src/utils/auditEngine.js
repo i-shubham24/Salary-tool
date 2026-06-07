@@ -1,17 +1,24 @@
+// src/utils/auditEngine.js
+
 export const performSalaryAudit = (oldData, newData) => {
   const oldMap = new Map();
+  
   oldData.forEach(item => {
-    // Uses "Type" column (e.g. Dr A Singh) as the unique ID
+    // Look for 'Type' (Dental College Format) or fallback to 'Employee ID'
     const empId = item['Type'] || item['Employee ID'];
     if (empId) {
       oldMap.set(String(empId).trim(), item);
     }
   });
 
-  // Mapped exactly to your CSV structure
+  // Comprehensive list of EVERY earning and deduction parameter from your specific files
   const salaryComponents = [
-    'BP', 'SPL', 'PGT', 'NPA', 'DA', 'HRAP', 'FMA', 
-    'PFD', 'IT', 'E-EXP', 'ADV', 'INS.', 'ESI'
+    // --- Earnings ---
+    'BP', 'SPL', 'PGT', 'NPA', 'DA', 'HRAP', 'FMA', 'AREAR', 'SHP', 'PFP', 'IR', 'Misc',
+    // --- Deductions ---
+    'SEC.', 'IT', 'PFD', 'E-EXP', 'ADV', 'MISC', 'INS.', 'Welfare', 'T/INS', 'ESI', 'HRAD', 'P.Tax.',
+    // --- Net/Total Shift Tracking ---
+    'T-DED.', 'NET PAY'
   ];
 
   let totalOldGross = 0;
@@ -24,7 +31,7 @@ export const performSalaryAudit = (oldData, newData) => {
 
     const oldEmp = oldMap.get(empId);
     
-    // T-PAY is your Gross
+    // Using T-PAY as the Gross Salary metric
     const newGross = parseFloat(newEmp['T-PAY'] || newEmp['Gross Salary']) || 0;
     totalNewGross += newGross;
 
@@ -46,6 +53,7 @@ export const performSalaryAudit = (oldData, newData) => {
     const breakdown = {};
     let hasComponentShift = false;
 
+    // Evaluate every single component to see exactly what caused the shift
     salaryComponents.forEach(component => {
       const oldVal = parseFloat(oldEmp[component]) || 0;
       const newVal = parseFloat(newEmp[component]) || 0;
@@ -62,6 +70,7 @@ export const performSalaryAudit = (oldData, newData) => {
       }
     });
 
+    // If their total pay shifted OR any internal structural allowance/deduction shifted
     if (grossDelta !== 0 || hasComponentShift) {
       detailedChanges.push({
         empId,
