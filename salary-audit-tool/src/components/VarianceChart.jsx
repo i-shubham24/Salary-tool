@@ -13,10 +13,14 @@ export default function VarianceChart({ changes }) {
   };
 
   return (
-    <div className="bg-white p-6 rounded-xl border shadow-sm h-full">
+    <div className="bg-white p-6 rounded-xl border shadow-sm h-full flex flex-col">
       <h3 className="font-bold text-md mb-4 text-slate-700">Structural Driver Impact</h3>
-      <div className="h-64">
-        <ResponsiveContainer width="100%" height="100%">
+      
+      {/* By providing an absolute height to the ResponsiveContainer instead of 100%, 
+        Recharts instantly knows its size on the very first render cycle. 
+      */}
+      <div className="w-full flex-grow mt-2">
+        <ResponsiveContainer width="100%" height={250}>
           <BarChart data={getChartData()}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="name" tick={{fontSize: 11}} />

@@ -4,7 +4,6 @@ import { performSalaryAudit } from './utils/auditEngine';
 import { generateAIAuditReport } from './services/gemini';
 import { RefreshCw, Cpu } from 'lucide-react';
 
-// Modular Components
 import FileUploader from './components/FileUploader';
 import SummaryCards from './components/SummaryCards';
 import VarianceChart from './components/VarianceChart';
@@ -24,6 +23,12 @@ export default function App() {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
+      // This strips away the top title rows before parsing the real data
+      beforeFirstChunk: (chunk) => {
+        const lines = chunk.split(/\r?\n/);
+        const headerIndex = lines.findIndex(line => line.includes('Type,BP') || line.includes('Employee ID'));
+        return headerIndex > -1 ? lines.slice(headerIndex).join('\n') : chunk;
+      },
       complete: (results) => {
         if (type === 'old') setOldCsv(results.data);
         if (type === 'new') setNewCsv(results.data);
@@ -44,7 +49,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-8">
-      {/* Top Header */}
       <header className="mb-8 border-b pb-4 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Credex Salary Audit Platform</h1>
@@ -57,7 +61,6 @@ export default function App() {
         )}
       </header>
 
-      {/* Upload Zone Grid */}
       {!auditData && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto mt-12">
           <FileUploader type="old" fileData={oldCsv} onFileChange={handleFileChange} />
@@ -65,14 +68,10 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Results Dashboard Grid */}
       {auditData && (
         <div className="space-y-6">
-          
-          {/* Top Row: Statistical Highlights */}
           <SummaryCards summary={auditData.summary} anomalyCount={auditData.changes.length} />
 
-          {/* Middle Row: Component Chart & Detailed Table */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-1">
               <VarianceChart changes={auditData.changes} />
@@ -82,7 +81,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Bottom Row: Intelligent Insights Panel via Gemini Layer */}
           <div className="bg-gradient-to-r from-slate-900 to-indigo-950 text-white p-8 rounded-xl shadow-md mt-8">
             <div className="flex items-center gap-2 mb-4">
               <Cpu className="w-6 h-6 text-indigo-400 animate-pulse" />
@@ -99,7 +97,6 @@ export default function App() {
               </div>
             )}
           </div>
-
         </div>
       )}
     </div>
