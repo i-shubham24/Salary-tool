@@ -15,8 +15,10 @@ export default function VarianceChart({ changes }) {
   return (
     <div className="bg-white p-6 rounded-xl border shadow-sm h-full">
       <h3 className="font-bold text-md mb-4 text-slate-700">Structural Driver Impact</h3>
-      <div className="h-64">
-        <ResponsiveContainer width="100%" height="100%">
+      {/* Added w-full and min-h-[250px] to the parent div */}
+      <div className="h-64 w-full min-h-[250px]">
+        {/* Added minHeight and minWidth props directly to the container */}
+        <ResponsiveContainer width="100%" height="100%" minHeight={250} minWidth={0}>
           <BarChart data={getChartData()}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="name" tick={{fontSize: 11}} />
