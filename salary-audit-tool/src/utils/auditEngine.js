@@ -1,16 +1,17 @@
-// src/utils/auditEngine.js
-
 export const performSalaryAudit = (oldData, newData) => {
   const oldMap = new Map();
   oldData.forEach(item => {
-    if (item['Employee ID']) {
-      oldMap.set(String(item['Employee ID']).trim(), item);
+    // Uses "Type" column (e.g. Dr A Singh) as the unique ID
+    const empId = item['Type'] || item['Employee ID'];
+    if (empId) {
+      oldMap.set(String(empId).trim(), item);
     }
   });
 
+  // Mapped exactly to your CSV structure
   const salaryComponents = [
-    'Basic', 'PF', 'DA', 'HRA', 'LTA', 
-    'Other Allowances', 'Perquisites', 'Medical Allowance'
+    'BP', 'SPL', 'PGT', 'NPA', 'DA', 'HRAP', 'FMA', 
+    'PFD', 'IT', 'E-EXP', 'ADV', 'INS.', 'ESI'
   ];
 
   let totalOldGross = 0;
@@ -18,18 +19,19 @@ export const performSalaryAudit = (oldData, newData) => {
   const detailedChanges = [];
 
   newData.forEach(newEmp => {
-    const empId = String(newEmp['Employee ID'] || '').trim();
+    const empId = String(newEmp['Type'] || newEmp['Employee ID'] || '').trim();
     if (!empId) return;
 
     const oldEmp = oldMap.get(empId);
-    const newGross = parseFloat(newEmp['Gross Salary']) || 0;
+    
+    // T-PAY is your Gross
+    const newGross = parseFloat(newEmp['T-PAY'] || newEmp['Gross Salary']) || 0;
     totalNewGross += newGross;
 
     if (!oldEmp) {
-      // New Employee Entry
       detailedChanges.push({
         empId,
-        name: newEmp['Name'] || 'Unknown',
+        name: empId,
         type: 'NEW_EMPLOYEE',
         grossDelta: newGross,
         breakdown: {}
@@ -37,7 +39,7 @@ export const performSalaryAudit = (oldData, newData) => {
       return;
     }
 
-    const oldGross = parseFloat(oldEmp['Gross Salary']) || 0;
+    const oldGross = parseFloat(oldEmp['T-PAY'] || oldEmp['Gross Salary']) || 0;
     totalOldGross += oldGross;
     const grossDelta = newGross - oldGross;
 
@@ -63,7 +65,7 @@ export const performSalaryAudit = (oldData, newData) => {
     if (grossDelta !== 0 || hasComponentShift) {
       detailedChanges.push({
         empId,
-        name: newEmp['Name'] || oldEmp['Name'],
+        name: empId,
         type: 'MODIFIED',
         oldGross,
         newGross,
