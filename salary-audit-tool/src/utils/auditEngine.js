@@ -9,9 +9,13 @@ export const performSalaryAudit = (oldData, newData) => {
     }
   });
 
+  // Comprehensive list of EVERY earning and deduction parameter from your specific files
   const salaryComponents = [
+    // --- Earnings ---
     'BP', 'SPL', 'PGT', 'NPA', 'DA', 'HRAP', 'FMA', 'AREAR', 'SHP', 'PFP', 'IR', 'Misc',
+    // --- Deductions ---
     'SEC.', 'IT', 'PFD', 'E-EXP', 'ADV', 'MISC', 'INS.', 'Welfare', 'T/INS', 'ESI', 'HRAD', 'P.Tax.',
+    // --- Net/Total Shift Tracking ---
     'T-DED.', 'NET PAY'
   ];
 
