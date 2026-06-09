@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertCircle, CheckCircle } from 'lucide-react';
 
 export default function AuditTable({ changes }) {
   const [expandedRow, setExpandedRow] = useState(null);
@@ -7,6 +7,19 @@ export default function AuditTable({ changes }) {
   const toggleRow = (empId) => {
     setExpandedRow(expandedRow === empId ? null : empId);
   };
+
+  // NEW: Graceful handling for completely identical files
+  if (!changes || changes.length === 0) {
+    return (
+      <div className="bg-white rounded-xl border shadow-sm overflow-hidden h-full flex flex-col items-center justify-center p-12 text-center min-h-[300px]">
+        <CheckCircle className="w-16 h-16 text-emerald-500 mb-4" />
+        <h3 className="text-xl font-bold text-slate-800 mb-2">Payroll Structures are Identical</h3>
+        <p className="text-slate-500 max-w-sm text-sm leading-relaxed">
+          No variances, new hires, or departed employees were detected between the historical and revised datasets.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-xl border shadow-sm overflow-hidden h-full flex flex-col">
@@ -28,7 +41,6 @@ export default function AuditTable({ changes }) {
           <tbody className="divide-y divide-slate-200">
             {changes.map((change) => (
               <React.Fragment key={change.empId}>
-                {/* Main Row */}
                 <tr 
                   onClick={() => toggleRow(change.empId)}
                   className={`hover:bg-slate-50 cursor-pointer transition-colors ${expandedRow === change.empId ? 'bg-blue-50/50' : ''}`}
@@ -51,7 +63,6 @@ export default function AuditTable({ changes }) {
                   </td>
                 </tr>
 
-                {/* Expanded Details Sub-Row */}
                 {expandedRow === change.empId && (
                   <tr className="bg-slate-50 border-b border-slate-200">
                     <td colSpan="5" className="p-0">
