@@ -39,7 +39,10 @@ export default function AuditTable({ changes }) {
                   <td className="p-3 font-mono text-xs text-slate-500">{change.empId}</td>
                   <td className="p-3 font-medium text-slate-800">{change.name}</td>
                   <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded text-xs font-semibold ${change.type === 'NEW_EMPLOYEE' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                    <span className={`px-2 py-0.5 rounded text-xs font-semibold 
+                      ${change.type === 'NEW_EMPLOYEE' ? 'bg-emerald-100 text-emerald-700' : 
+                        change.type === 'DEPARTED' ? 'bg-rose-100 text-rose-700' : 
+                        'bg-blue-100 text-blue-700'}`}>
                       {change.type}
                     </span>
                   </td>
@@ -58,7 +61,9 @@ export default function AuditTable({ changes }) {
                         </h4>
                         
                         {Object.keys(change.breakdown).length === 0 ? (
-                          <p className="text-sm text-slate-500 italic">No internal components shifted.</p>
+                          <p className="text-sm text-slate-500 italic">
+                            {change.type === 'DEPARTED' ? 'Employee removed from current payroll cycle.' : 'No internal components shifted.'}
+                          </p>
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             {Object.entries(change.breakdown).map(([component, data]) => (
