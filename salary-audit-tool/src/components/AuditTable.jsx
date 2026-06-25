@@ -81,10 +81,9 @@ export default function AuditTable({ changes }) {
                             {change.type === 'DEPARTED' ? 'Employee removed from current payroll cycle.' : 'No internal components shifted.'}
                           </p>
                         ) : (
-                          /* Highly expansive grid to support 26 parameters if necessary */
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                          <div className="flex flex-wrap gap-3">
                             {Object.entries(change.breakdown).map(([component, data]) => (
-                              <div key={component} className="bg-white p-3 rounded border shadow-sm flex flex-col">
+                              <div key={component} className="bg-white p-3 rounded border shadow-sm flex flex-col min-w-[140px] flex-1 max-w-[200px]">
                                 <span className="font-semibold text-slate-700 text-xs mb-1 truncate" title={component}>{component}</span>
                                 <div className="flex justify-between text-[10px] text-slate-500 mt-1">
                                   <span>Old: <span className="font-mono">{data.old.toLocaleString()}</span></span>
