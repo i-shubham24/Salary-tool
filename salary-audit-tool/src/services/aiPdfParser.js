@@ -44,7 +44,7 @@ export const parsePdfWithAI = async (file) => {
     const jsonString = result.response.text();
     return JSON.parse(jsonString);
   } catch (error) {
-    console.error("AI Parsing Error:", error);
-    throw new Error("The AI Engine failed to read the document. Ensure it is a valid PDF and API quota is available.");
+    console.error("AI Parsing Error Details:", error);
+        throw new Error(`Google API Error: ${error.message}`);
   }
 };
