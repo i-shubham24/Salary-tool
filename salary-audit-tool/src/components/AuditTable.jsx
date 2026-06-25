@@ -1,3 +1,4 @@
+// src/components/AuditTable.jsx
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, AlertCircle, CheckCircle } from 'lucide-react';
 
@@ -8,14 +9,13 @@ export default function AuditTable({ changes }) {
     setExpandedRow(expandedRow === empId ? null : empId);
   };
 
-  // NEW: Graceful handling for completely identical files
   if (!changes || changes.length === 0) {
     return (
       <div className="bg-white rounded-xl border shadow-sm overflow-hidden h-full flex flex-col items-center justify-center p-12 text-center min-h-[300px]">
         <CheckCircle className="w-16 h-16 text-emerald-500 mb-4" />
         <h3 className="text-xl font-bold text-slate-800 mb-2">Payroll Structures are Identical</h3>
         <p className="text-slate-500 max-w-sm text-sm leading-relaxed">
-          No variances, new hires, or departed employees were detected between the historical and revised datasets.
+          No variances, new hires, or departed employees were detected between the documented months.
         </p>
       </div>
     );
@@ -32,10 +32,10 @@ export default function AuditTable({ changes }) {
           <thead className="sticky top-0 bg-slate-100 z-10 shadow-sm">
             <tr className="text-slate-500 uppercase text-xs font-semibold tracking-wider border-b">
               <th className="p-3 w-10"></th>
-              <th className="p-3">ID</th>
-              <th className="p-3">Name</th>
+              <th className="p-3">ID / Name</th>
               <th className="p-3">Status</th>
-              <th className="p-3 text-right">Net Gross Shift</th>
+              <th className="p-3 text-right text-indigo-600">Gross Shift (T.Pay)</th>
+              <th className="p-3 text-right text-emerald-600">Net Pay Shift</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
@@ -48,18 +48,23 @@ export default function AuditTable({ changes }) {
                   <td className="p-3 text-slate-400">
                     {expandedRow === change.empId ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </td>
-                  <td className="p-3 font-mono text-xs text-slate-500">{change.empId}</td>
-                  <td className="p-3 font-medium text-slate-800">{change.name}</td>
                   <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded text-xs font-semibold 
+                    <div className="font-medium text-slate-800">{change.name}</div>
+                    <div className="font-mono text-[10px] text-slate-500">{change.empId}</div>
+                  </td>
+                  <td className="p-3">
+                    <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider 
                       ${change.type === 'NEW_EMPLOYEE' ? 'bg-emerald-100 text-emerald-700' : 
                         change.type === 'DEPARTED' ? 'bg-rose-100 text-rose-700' : 
                         'bg-blue-100 text-blue-700'}`}>
                       {change.type}
                     </span>
                   </td>
-                  <td className={`p-3 text-right font-bold ${change.grossDelta > 0 ? 'text-emerald-600' : change.grossDelta < 0 ? 'text-rose-600' : 'text-slate-600'}`}>
+                  <td className={`p-3 text-right font-bold ${change.grossDelta > 0 ? 'text-indigo-600' : change.grossDelta < 0 ? 'text-rose-600' : 'text-slate-400'}`}>
                     {change.grossDelta > 0 ? '+' : ''}{change.grossDelta.toLocaleString()}
+                  </td>
+                  <td className={`p-3 text-right font-bold ${change.netDelta > 0 ? 'text-emerald-600' : change.netDelta < 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                    {change.netDelta > 0 ? '+' : ''}{change.netDelta.toLocaleString()}
                   </td>
                 </tr>
 
@@ -76,17 +81,17 @@ export default function AuditTable({ changes }) {
                             {change.type === 'DEPARTED' ? 'Employee removed from current payroll cycle.' : 'No internal components shifted.'}
                           </p>
                         ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                             {Object.entries(change.breakdown).map(([component, data]) => (
                               <div key={component} className="bg-white p-3 rounded border shadow-sm flex flex-col">
-                                <span className="font-semibold text-slate-700 text-sm mb-1">{component}</span>
-                                <div className="flex justify-between text-xs text-slate-500 mt-1">
+                                <span className="font-semibold text-slate-700 text-xs mb-1 truncate" title={component}>{component}</span>
+                                <div className="flex justify-between text-[10px] text-slate-500 mt-1">
                                   <span>Old: <span className="font-mono">{data.old.toLocaleString()}</span></span>
                                   <span>New: <span className="font-mono">{data.new.toLocaleString()}</span></span>
                                 </div>
                                 <div className={`text-right text-xs font-bold mt-2 pt-2 border-t ${data.delta > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                                   Diff: {data.delta > 0 ? '+' : ''}{data.delta.toLocaleString()} 
-                                  <span className="text-[10px] ml-1 text-slate-400">({data.pct}%)</span>
+                                  <span className="text-[9px] ml-1 text-slate-400">({data.pct}%)</span>
                                 </div>
                               </div>
                             ))}
