@@ -1,50 +1,53 @@
+// src/App.jsx
 import React, { useState } from 'react';
-import Papa from 'papaparse';
+import { parsePdfWithAI } from './services/aiPdfParser';
 import { performSalaryAudit } from './utils/auditEngine';
 import { generateAIAuditReport } from './services/gemini';
-import { RefreshCw, Cpu } from 'lucide-react';
+import { RefreshCw, Cpu, BrainCircuit } from 'lucide-react';
 
-import FileUploader from './components/FileUploader';
+import PdfUploader from './components/PdfUploader';
 import SummaryCards from './components/SummaryCards';
 import VarianceChart from './components/VarianceChart';
 import AuditTable from './components/AuditTable';
 
 export default function App() {
-  const [oldCsv, setOldCsv] = useState(null);
-  const [newCsv, setNewCsv] = useState(null);
+  const [pdfFile, setPdfFile] = useState(null);
   const [auditData, setAuditData] = useState(null);
   const [aiReport, setAiReport] = useState('');
   const [isLoadingAi, setIsLoadingAi] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
 
-  const handleFileChange = (e, type) => {
+  const handleFileChange = (e) => {
     const file = e.target.files[0];
-    if (!file) return;
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      // This strips away the top title rows before parsing the real data
-      beforeFirstChunk: (chunk) => {
-        const lines = chunk.split(/\r?\n/);
-        const headerIndex = lines.findIndex(line => line.includes('Type,BP') || line.includes('Employee ID'));
-        return headerIndex > -1 ? lines.slice(headerIndex).join('\n') : chunk;
-      },
-      complete: (results) => {
-        if (type === 'old') setOldCsv(results.data);
-        if (type === 'new') setNewCsv(results.data);
-      }
-    });
+    if (file) setPdfFile(file);
   };
 
   const processAudit = async () => {
-    if (!oldCsv || !newCsv) return;
-    const results = performSalaryAudit(oldCsv, newCsv);
-    setAuditData(results);
+    if (!pdfFile) return;
+    setIsParsing(true);
+    setAuditData(null);
+    setAiReport('');
     
-    setIsLoadingAi(true);
-    const report = await generateAIAuditReport(results);
-    setAiReport(report);
-    setIsLoadingAi(false);
+    try {
+      // 1. Send Document to Gemini for Deep Learning Data Extraction
+      const { oldData, newData } = await parsePdfWithAI(pdfFile);
+      
+      // 2. Run Deterministic Mathematical Sweep Engine
+      const results = performSalaryAudit(oldData, newData);
+      setAuditData(results);
+      setIsParsing(false);
+      
+      // 3. Trigger Gemini Layer for the Executive Summary
+      setIsLoadingAi(true);
+      const report = await generateAIAuditReport(results);
+      setAiReport(report);
+      setIsLoadingAi(false);
+
+    } catch (error) {
+      console.error("PDF Parsing Error:", error);
+      alert(error.message || "Failed to process PDF.");
+      setIsParsing(false);
+    }
   };
 
   return (
@@ -52,19 +55,22 @@ export default function App() {
       <header className="mb-8 border-b pb-4 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Credex Salary Audit Platform</h1>
-          <p className="text-sm text-slate-500 mt-1">Precise automated mathematical and generative payroll variance tracking</p>
+          <p className="text-sm text-slate-500 mt-1">Deep Learning PDF Data Extraction & Automated Variance Engine</p>
         </div>
-        {(oldCsv && newCsv) && (
-          <button onClick={processAudit} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 font-medium transition-colors shadow-sm">
-            <RefreshCw className="w-4 h-4" /> Execute Audit Engine
+        {pdfFile && (
+          <button 
+            onClick={processAudit} 
+            disabled={isParsing}
+            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-2 font-medium transition-colors shadow-sm disabled:opacity-50">
+            {isParsing ? <BrainCircuit className="w-4 h-4 animate-pulse" /> : <RefreshCw className="w-4 h-4" />}
+            {isParsing ? 'AI Reading Document...' : 'Execute Audit Engine'}
           </button>
         )}
       </header>
 
       {!auditData && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto mt-12">
-          <FileUploader type="old" fileData={oldCsv} onFileChange={handleFileChange} />
-          <FileUploader type="new" fileData={newCsv} onFileChange={handleFileChange} />
+        <div className="mt-16">
+          <PdfUploader fileData={pdfFile} onFileChange={handleFileChange} />
         </div>
       )}
 
