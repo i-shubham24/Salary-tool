@@ -17,34 +17,55 @@ export const parsePdfWithAI = async (file) => {
   if (!apiKey) throw new Error("Missing VITE_GEMINI_API_KEY");
 
   const genAI = new GoogleGenerativeAI(apiKey);
+  
   const model = genAI.getGenerativeModel({ 
     model: "gemini-2.5-flash",
-    generationConfig: { responseMimeType: "application/json" }
+    systemInstruction: "You are a high-speed, deterministic data extraction API. Your only purpose is to output strictly formatted JSON. Strip all commas from numeric values. Never output conversational text or error messages.",
+    generationConfig: { 
+      responseMimeType: "application/json",
+      temperature: 0.0, 
+      topK: 1, 
+    }
   });
 
   const prompt = `
-    You are an expert financial AI data extractor. 
-    Read this payroll certificate PDF carefully. It contains employee salary tables spanning two distinct months.
-    
+    Read this payroll certificate PDF. 
     For EVERY employee listed:
-    1. Extract their Name and Employee ID (Emp No).
-    2. Extract their data for the FIRST month into an "oldData" array.
-    3. Extract their data for the SECOND month into a "newData" array.
-    4. IGNORE the "Total" row completely.
+    1. Extract Name and Employee ID.
+    2. Extract FIRST month data to "oldData" array.
+    3. Extract SECOND month data to "newData" array.
+    4. IGNORE the "Total" row.
     
-    Format Requirements:
-    - Return RAW NUMBERS ONLY. Strip all commas (e.g., return 29650 instead of "29,650").
-    - Use the exact column headers found in the PDF (e.g., "Basic", "Spl.", "PGT", "T.Pay", "Net Pay", "PFD").
-    - Output a single JSON object: { "oldData": [...], "newData": [...] }
+    Output Format: { "oldData": [...], "newData": [...] }
+    Use the exact column headers found in the document. 
+    Output raw numbers only (e.g. 29650, not "29,650").
   `;
 
   try {
     const pdfPart = await fileToGenerativePart(file);
     const result = await model.generateContent([prompt, pdfPart]);
-    const jsonString = result.response.text();
-    return JSON.parse(jsonString);
+    let rawText = result.response.text();
+
+    // SAFETY NET 1: Strip Markdown formatting if the AI accidentally adds it
+    rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    // SAFETY NET 2: Catch if the AI literally wrote an "Error" message instead of JSON
+    if (rawText.startsWith("Error") || rawText.startsWith("I cannot")) {
+      console.warn("AI generated a text response instead of JSON:", rawText);
+      throw new Error(`AI Engine Refusal: ${rawText.substring(0, 50)}...`);
+    }
+
+    // Attempt to safely parse the cleaned string
+    return JSON.parse(rawText);
+
   } catch (error) {
-    console.error("AI Parsing Error:", error);
-    throw new Error("The AI Engine failed to read the document. Ensure it is a valid PDF and API quota is available.");
+    console.error("AI Parsing Error Details:", error);
+    
+    // If it STILL fails to parse, it means the JSON was truncated or malformed
+    if (error instanceof SyntaxError) {
+      throw new Error("The AI returned a malformed data structure. The PDF might be too large for a single extraction. Please try again.");
+    }
+    
+    throw new Error(error.message || "The AI Engine failed to read the document due to network timeout or quota limits.");
   }
 };
