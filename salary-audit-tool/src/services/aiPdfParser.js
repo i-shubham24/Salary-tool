@@ -33,8 +33,9 @@ export const parsePdfWithAI = async (file) => {
     4. IGNORE the "Total" row completely.
     
     Format Requirements:
-    - Return RAW NUMBERS ONLY. Strip all commas (e.g., return 29650 instead of "29,650").
+    - Return RAW NUMBERS ONLY for financial values. Strip all commas (e.g., return 29650 instead of "29,650").
     - Use the exact column headers found in the PDF (e.g., "Basic", "Spl.", "PGT", "T.Pay", "Net Pay", "PFD").
+    - **CRITICAL:** You MUST extract the timeline for each month into two explicit keys: "Month" (String, e.g. "MAY 2026") and "Days" (Number, e.g. 31).
     - Output a single JSON object: { "oldData": [...], "newData": [...] }
   `;
 
@@ -45,6 +46,6 @@ export const parsePdfWithAI = async (file) => {
     return JSON.parse(jsonString);
   } catch (error) {
     console.error("AI Parsing Error Details:", error);
-        throw new Error(`Google API Error: ${error.message}`);
+    throw new Error(`Google API Error: ${error.message}`);
   }
 };

@@ -4,7 +4,6 @@ export const performSalaryAudit = (oldData, newData) => {
   const oldMap = new Map();
   
   oldData.forEach(item => {
-    // Highly flexible ID targeting based on what the AI extracts
     const empId = item['Employee ID'] || item['Emp No'] || item['ID'];
     if (empId) oldMap.set(String(empId).trim(), item);
   });
@@ -14,7 +13,6 @@ export const performSalaryAudit = (oldData, newData) => {
   const detailedChanges = [];
   const processedEmpIds = new Set();
 
-  // Strict Number Sanitizer (Fixes the comma and floating point bugs)
   const parseAmt = (val) => {
     if (val === undefined || val === null) return 0;
     const cleaned = String(val).replace(/,/g, '').replace(/[^\d.-]/g, '');
@@ -28,7 +26,6 @@ export const performSalaryAudit = (oldData, newData) => {
     processedEmpIds.add(empId);
     const oldEmp = oldMap.get(empId);
 
-    // Dynamically locate the Gross (T.Pay) and Net columns regardless of slight AI naming changes
     const grossKey = Object.keys(newEmp).find(k => k.toLowerCase().includes('t.pay') || k.toLowerCase().includes('gross')) || 'T.Pay';
     const netKey = Object.keys(newEmp).find(k => k.toLowerCase().includes('net')) || 'Net Pay';
 
@@ -38,7 +35,8 @@ export const performSalaryAudit = (oldData, newData) => {
     if (!oldEmp) {
       detailedChanges.push({
         empId, name: newEmp['Name'] || 'Unknown', type: 'NEW_EMPLOYEE', 
-        grossDelta: newGross, netDelta: parseAmt(newEmp[netKey]), breakdown: {}
+        grossDelta: newGross, netDelta: parseAmt(newEmp[netKey]), 
+        oldMonth: '-', newMonth: newEmp['Month'] || 'Current', oldDays: 0, newDays: parseAmt(newEmp['Days']), breakdown: {}
       });
       return;
     }
@@ -46,17 +44,21 @@ export const performSalaryAudit = (oldData, newData) => {
     const oldGross = parseAmt(oldEmp[grossKey]);
     totalOldGross += oldGross;
     
-    // Strict rounding to 2 decimal places to prevent 0.00000001 triggers
     const grossDelta = Math.round((newGross - oldGross) * 100) / 100;
     const netDelta = Math.round((parseAmt(newEmp[netKey]) - parseAmt(oldEmp[netKey])) * 100) / 100;
+
+    // Grab the timeline context
+    const oldMonth = oldEmp['Month'] || 'Month 1';
+    const newMonth = newEmp['Month'] || 'Month 2';
+    const oldDays = parseAmt(oldEmp['Days']);
+    const newDays = parseAmt(newEmp['Days']);
 
     const breakdown = {};
     let hasComponentShift = false;
 
-    // DYNAMIC EXTRACTION: Find EVERY key present in either the old or new month
     const allKeys = new Set([...Object.keys(oldEmp), ...Object.keys(newEmp)]);
     
-    // Remove non-financial or top-level keys from the breakdown grid
+    // Crucial: Delete Month and Days so they don't get processed as regular money
     ['Employee ID', 'Emp No', 'ID', 'Name', 'Month', 'Days'].forEach(k => allKeys.delete(k));
 
     allKeys.forEach(component => {
@@ -64,7 +66,6 @@ export const performSalaryAudit = (oldData, newData) => {
       const newVal = parseAmt(newEmp[component]);
       const delta = Math.round((newVal - oldVal) * 100) / 100;
 
-      // Only flag it if there is a TRUE mathematical difference greater than 0
       if (Math.abs(delta) > 0) {
         hasComponentShift = true;
         breakdown[component] = {
@@ -74,23 +75,25 @@ export const performSalaryAudit = (oldData, newData) => {
       }
     });
 
-    // If there is ANY real shift, log the employee
+    // FIXED: Removed the `oldDays !== newDays` trigger. 
+    // Now, employees ONLY appear if there is a true financial change.
     if (Math.abs(grossDelta) > 0 || Math.abs(netDelta) > 0 || hasComponentShift) {
       detailedChanges.push({
         empId, name: newEmp['Name'] || oldEmp['Name'] || 'Unknown', 
-        type: 'MODIFIED', oldGross, newGross, grossDelta, netDelta, breakdown
+        type: 'MODIFIED', oldGross, newGross, grossDelta, netDelta, 
+        oldMonth, newMonth, oldDays, newDays, breakdown
       });
     }
   });
 
-  // Sweep for Departed Employees
   oldMap.forEach((oldEmp, empId) => {
     if (!processedEmpIds.has(empId)) {
       const oldGross = parseAmt(oldEmp['T.Pay'] || oldEmp['Gross Salary']);
       totalOldGross += oldGross;
       detailedChanges.push({
         empId, name: oldEmp['Name'] || 'Unknown', type: 'DEPARTED', 
-        oldGross: oldGross, newGross: 0, grossDelta: -oldGross, netDelta: -parseAmt(oldEmp['Net Pay']), breakdown: {}
+        oldGross: oldGross, newGross: 0, grossDelta: -oldGross, netDelta: -parseAmt(oldEmp['Net Pay']),
+        oldMonth: oldEmp['Month'] || 'Previous', newMonth: '-', oldDays: parseAmt(oldEmp['Days']), newDays: 0, breakdown: {}
       });
     }
   });
