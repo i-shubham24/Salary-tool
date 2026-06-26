@@ -21,7 +21,7 @@ export const parsePdfWithAI = async (file) => {
   
   // Locked to 1.5-flash to completely bypass the 20-request daily limit of 2.5!
   const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash",
+    model: "gemini-1.5-flash-latest",
     generationConfig: { responseMimeType: "application/json" }
   });
 
