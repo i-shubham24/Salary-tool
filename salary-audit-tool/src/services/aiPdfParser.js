@@ -2,7 +2,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { PDFDocument } from "pdf-lib";
 
-// Helper to safely convert PDF chunks to base64 for the API
 const arrayBufferToBase64 = (buffer) => {
   let binary = '';
   const bytes = new Uint8Array(buffer);
@@ -24,15 +23,17 @@ export const parsePdfWithAI = async (file) => {
     generationConfig: { responseMimeType: "application/json" }
   });
 
+  // THE UPGRADE: We specifically instruct the AI on how to handle 3+ months of data
   const prompt = `
     You are an expert financial AI data extractor. 
-    Read this payroll certificate PDF carefully. It contains employee salary tables spanning two distinct months.
+    Read this payroll certificate PDF carefully. It may contain employee salary tables spanning multiple months (e.g., 2, 3, or 4 months).
     
     For EVERY employee listed:
     1. Extract their Name and Employee ID (Emp No).
-    2. Extract their data for the FIRST month into an "oldData" array.
+    2. Extract their data for the FIRST (oldest) month into an "oldData" array.
     3. Extract their data for the SECOND month into a "newData" array.
-    4. IGNORE the "Total" row completely.
+    4. COMPLETELY IGNORE any 3rd, 4th, or subsequent months. ONLY extract the first two months.
+    5. IGNORE the "Total" row completely.
     
     Format Requirements:
     - Return RAW NUMBERS ONLY for financial values. Strip all commas (e.g., return 29650 instead of "29,650").
@@ -49,7 +50,6 @@ export const parsePdfWithAI = async (file) => {
     const allOldData = [];
     const allNewData = [];
 
-    // Slice the PDF into 8-page chunks to completely bypass the Output Token Limit
     const CHUNK_SIZE = 8;
     const totalChunks = Math.ceil(totalPages / CHUNK_SIZE);
 
@@ -57,7 +57,6 @@ export const parsePdfWithAI = async (file) => {
       const chunkNum = Math.floor(i / CHUNK_SIZE) + 1;
       console.log(`Processing AI Vision Chunk ${chunkNum} of ${totalChunks}...`);
 
-      // Create a mini-PDF in memory
       const miniPdf = await PDFDocument.create();
       const endPage = Math.min(i + CHUNK_SIZE, totalPages);
       const pageIndices = Array.from({ length: endPage - i }, (_, index) => i + index);
@@ -71,7 +70,6 @@ export const parsePdfWithAI = async (file) => {
         inlineData: { data: base64Data, mimeType: "application/pdf" },
       };
 
-      // Send the isolated mini-PDF to Gemini with built-in retries
       let attempts = 0;
       let success = false;
 
@@ -92,7 +90,6 @@ export const parsePdfWithAI = async (file) => {
         }
       }
 
-      // Delay to respect rate limits between chunks
       if (endPage < totalPages) await delay(2000);
     }
 
