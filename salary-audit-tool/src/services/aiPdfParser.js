@@ -1,16 +1,18 @@
 // src/services/aiPdfParser.js
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { PDFDocument } from "pdf-lib";
 
-const fileToGenerativePart = async (file) => {
-  const base64EncodedDataPromise = new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result.split(',')[1]);
-    reader.readAsDataURL(file);
-  });
-  return {
-    inlineData: { data: await base64EncodedDataPromise, mimeType: file.type },
-  };
+// Helper to safely convert PDF chunks to base64 for the API
+const arrayBufferToBase64 = (buffer) => {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
 };
+
+const delay = (ms) => new Promise(res => setTimeout(res, ms));
 
 export const parsePdfWithAI = async (file) => {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -34,16 +36,68 @@ export const parsePdfWithAI = async (file) => {
     
     Format Requirements:
     - Return RAW NUMBERS ONLY for financial values. Strip all commas (e.g., return 29650 instead of "29,650").
-    - Use the exact column headers found in the PDF (e.g., "Basic", "Spl.", "PGT", "T.Pay", "Net Pay", "PFD").
+    - Use the exact column headers found in the PDF.
     - **CRITICAL:** You MUST extract the timeline for each month into two explicit keys: "Month" (String, e.g. "MAY 2026") and "Days" (Number, e.g. 31).
     - Output a single JSON object: { "oldData": [...], "newData": [...] }
   `;
 
   try {
-    const pdfPart = await fileToGenerativePart(file);
-    const result = await model.generateContent([prompt, pdfPart]);
-    const jsonString = result.response.text();
-    return JSON.parse(jsonString);
+    const fileBuffer = await file.arrayBuffer();
+    const pdfDoc = await PDFDocument.load(fileBuffer);
+    const totalPages = pdfDoc.getPageCount();
+
+    const allOldData = [];
+    const allNewData = [];
+
+    // Slice the PDF into 8-page chunks to completely bypass the Output Token Limit
+    const CHUNK_SIZE = 8;
+    const totalChunks = Math.ceil(totalPages / CHUNK_SIZE);
+
+    for (let i = 0; i < totalPages; i += CHUNK_SIZE) {
+      const chunkNum = Math.floor(i / CHUNK_SIZE) + 1;
+      console.log(`Processing AI Vision Chunk ${chunkNum} of ${totalChunks}...`);
+
+      // Create a mini-PDF in memory
+      const miniPdf = await PDFDocument.create();
+      const endPage = Math.min(i + CHUNK_SIZE, totalPages);
+      const pageIndices = Array.from({ length: endPage - i }, (_, index) => i + index);
+      const copiedPages = await miniPdf.copyPages(pdfDoc, pageIndices);
+      copiedPages.forEach((page) => miniPdf.addPage(page));
+
+      const miniPdfBytes = await miniPdf.save();
+      const base64Data = arrayBufferToBase64(miniPdfBytes);
+
+      const inlineData = {
+        inlineData: { data: base64Data, mimeType: "application/pdf" },
+      };
+
+      // Send the isolated mini-PDF to Gemini with built-in retries
+      let attempts = 0;
+      let success = false;
+
+      while (!success && attempts < 3) {
+        try {
+          const result = await model.generateContent([prompt, inlineData]);
+          const jsonString = result.response.text();
+          const parsed = JSON.parse(jsonString);
+
+          if (parsed.oldData) allOldData.push(...parsed.oldData);
+          if (parsed.newData) allNewData.push(...parsed.newData);
+          success = true;
+        } catch (err) {
+          attempts++;
+          console.warn(`Chunk ${chunkNum} failed attempt ${attempts}:`, err);
+          if (attempts >= 3) throw err;
+          await delay(4000); 
+        }
+      }
+
+      // Delay to respect rate limits between chunks
+      if (endPage < totalPages) await delay(2000);
+    }
+
+    return { oldData: allOldData, newData: allNewData };
+
   } catch (error) {
     console.error("AI Parsing Error Details:", error);
     throw new Error(`Google API Error: ${error.message}`);
