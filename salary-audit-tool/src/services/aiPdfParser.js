@@ -18,21 +18,23 @@ export const parsePdfWithAI = async (file) => {
   if (!apiKey) throw new Error("Missing VITE_GEMINI_API_KEY");
 
   const genAI = new GoogleGenerativeAI(apiKey);
+  
+  // Locked to 1.5-flash to completely bypass the 20-request daily limit of 2.5!
   const model = genAI.getGenerativeModel({ 
-    model: "gemini-2.5-flash",
+    model: "gemini-1.5-flash",
     generationConfig: { responseMimeType: "application/json" }
   });
 
-  // THE UPGRADE: We specifically instruct the AI on how to handle 3+ months of data
+  // UPGRADE: The prompt now uses conditional logic so it doesn't crash on exactly 2 months.
   const prompt = `
     You are an expert financial AI data extractor. 
-    Read this payroll certificate PDF carefully. It may contain employee salary tables spanning multiple months (e.g., 2, 3, or 4 months).
+    Read this payroll certificate PDF carefully. It contains employee salary tables spanning 2 or more months.
     
     For EVERY employee listed:
     1. Extract their Name and Employee ID (Emp No).
     2. Extract their data for the FIRST (oldest) month into an "oldData" array.
     3. Extract their data for the SECOND month into a "newData" array.
-    4. COMPLETELY IGNORE any 3rd, 4th, or subsequent months. ONLY extract the first two months.
+    4. IF there are additional months (like a 3rd or 4th month), IGNORE them completely. Your output must strictly contain only the first two months.
     5. IGNORE the "Total" row completely.
     
     Format Requirements:
