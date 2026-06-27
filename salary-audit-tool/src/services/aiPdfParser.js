@@ -38,13 +38,12 @@ export const parsePdfWithAI = async (file, updateStatus) => {
 
   const genAI = new GoogleGenerativeAI(apiKey);
   
-  // FIXED: Using the actual stable high-capacity model
   const model = genAI.getGenerativeModel({ 
     model: "gemini-3.1-flash-lite",
     generationConfig: { responseMimeType: "application/json" }
   });
 
-  // CRITICAL UPGRADE: Flat architecture. The AI simply grabs rows; JS handles the pairing later.
+  // UPGRADE: Heavily fortified prompt to prevent "Column Drift" and handle duplicate headers
   const prompt = `
     You are an expert financial AI data extractor. 
     Read this payroll certificate PDF. Extract EVERY SINGLE employee salary row you see into a single flat array.
@@ -54,14 +53,18 @@ export const parsePdfWithAI = async (file, updateStatus) => {
     2. The specific Month (String, e.g. "MAY 2026") and Days (Number).
     3. All financial parameters using the exact column headers found in the PDF.
     
+    CRITICAL ANTI-DRIFT & LAYOUT INSTRUCTIONS:
+    - AVOID COLUMN DRIFT: This table is very wide with many consecutive zeros (0). You MUST trace vertically down from each specific header to the exact number below it. Do not shift values left or right.
+    - DUPLICATE HEADERS: Notice there is a "Misc" column BEFORE T.Pay, and a second "Misc." column AFTER Adv. You MUST name them "Misc 1" and "Misc 2" in your JSON to prevent data from being overwritten!
+    - Verify that DA, HRA, FMA, and Arear values strictly align with their headers.
+    
     Format Requirements:
     - IGNORE "Total" rows completely.
     - Return RAW NUMBERS ONLY for financial values. Strip all commas.
     - Output STRICTLY in this JSON format:
       {
         "extractedData": [
-          { "Employee ID": "123", "Name": "John", "Month": "MAY 2026", "Days": 31, "T.Pay": 50000, ... },
-          { "Employee ID": "123", "Name": "John", "Month": "JUN 2026", "Days": 30, "T.Pay": 50000, ... }
+          { "Employee ID": "123", "Name": "John", "Month": "MAY 2026", "Days": 31, "T.Pay": 50000, "Misc 1": 0, "Misc 2": 120, ... }
         ]
       }
   `;
@@ -106,7 +109,6 @@ export const parsePdfWithAI = async (file, updateStatus) => {
           
           const parsed = JSON.parse(jsonString);
 
-          // Push the flat rows into our master list
           if (parsed.extractedData) allExtractedData.push(...parsed.extractedData);
           success = true;
         } catch (err) {
@@ -131,8 +133,6 @@ export const parsePdfWithAI = async (file, updateStatus) => {
 
     if (updateStatus) updateStatus("Compiling Variance Report...");
 
-    // --- THE MAGIC: JAVASCRIPT ASSEMBLY ---
-    // Group all the randomly scattered rows by Employee ID
     const employeeMap = new Map();
     
     allExtractedData.forEach(row => {
@@ -148,15 +148,11 @@ export const parsePdfWithAI = async (file, updateStatus) => {
     const finalOldData = [];
     const finalNewData = [];
 
-    // Because chunks are processed chronologically (Pages 1 to End), 
-    // the records arrays are naturally in chronological order!
     employeeMap.forEach((empData) => {
       if (empData.records.length >= 2) {
-        // Only grab the very first two months to ignore 3rd/4th quarters
         finalOldData.push(empData.records[0]);
         finalNewData.push(empData.records[1]);
       } else if (empData.records.length === 1) {
-        // Handle new hires or departed employees with only 1 month
         finalOldData.push(empData.records[0]);
       }
     });
