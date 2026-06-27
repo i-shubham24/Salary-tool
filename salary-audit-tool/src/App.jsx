@@ -6,13 +6,13 @@ import { RefreshCw, BrainCircuit, Download } from 'lucide-react';
 
 import PdfUploader from './components/PdfUploader';
 import SummaryCards from './components/SummaryCards';
-import VarianceChart from './components/VarianceChart';
-import AuditTable from './components/AuditTable';
+import AuditTable from './components/AuditTable'; // VarianceChart import removed here
 
 export default function App() {
   const [pdfFile, setPdfFile] = useState(null);
   const [auditData, setAuditData] = useState(null);
   const [isParsing, setIsParsing] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState('');
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -23,16 +23,19 @@ export default function App() {
     if (!pdfFile) return;
     setIsParsing(true);
     setAuditData(null);
+    setLoadingStatus('Initializing AI Vision...');
     
     try {
-      const { oldData, newData } = await parsePdfWithAI(pdfFile);
+      const { oldData, newData } = await parsePdfWithAI(pdfFile, setLoadingStatus);
       const results = performSalaryAudit(oldData, newData);
       setAuditData(results);
       setIsParsing(false);
+      setLoadingStatus('');
     } catch (error) {
       console.error("AI Parsing Error Details:", error);
       alert(error.message || "Failed to process PDF.");
       setIsParsing(false);
+      setLoadingStatus('');
     }
   };
 
@@ -62,9 +65,9 @@ export default function App() {
             <button 
               onClick={processAudit} 
               disabled={isParsing}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-2 font-medium transition-colors shadow-sm disabled:opacity-50 min-w-[240px] justify-center">
+              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-2 font-medium transition-colors shadow-sm disabled:opacity-50 min-w-[280px] justify-center">
               {isParsing ? <BrainCircuit className="w-4 h-4 animate-pulse" /> : <RefreshCw className="w-4 h-4" />}
-              {isParsing ? 'AI Reading Document...' : 'Execute Audit Engine'}
+              {isParsing ? (loadingStatus || 'AI Reading Document...') : 'Execute Audit Engine'}
             </button>
           )}
         </div>
@@ -80,13 +83,9 @@ export default function App() {
         <div className="space-y-6 print:space-y-4">
           <SummaryCards summary={auditData.summary} anomalyCount={auditData.changes.length} />
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:block">
-            <div className="lg:col-span-1 print:mb-6">
-              <VarianceChart changes={auditData.changes} />
-            </div>
-            <div className="lg:col-span-2">
-              <AuditTable changes={auditData.changes} />
-            </div>
+          {/* Grid layout removed; AuditTable now takes up 100% full width */}
+          <div className="w-full">
+            <AuditTable changes={auditData.changes} />
           </div>
         </div>
       )}
